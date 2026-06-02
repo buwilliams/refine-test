@@ -10,6 +10,9 @@ run stays self-contained.
 
 from __future__ import annotations
 
+import os
+import shutil
+import subprocess
 import time
 
 import pytest
@@ -17,6 +20,42 @@ import requests
 
 from tests.support.cli import combined_output, configured_port, run_refine_cli
 from tests.support.env import TEST_APP_PATH, refine_base_url
+
+
+# A throwaway port for the persistent-service test, distinct from the smoke
+# instance's port so installing/uninstalling a systemd unit never disturbs it.
+INSTALL_TEST_PORT = "8099"
+
+
+def _systemd_service_management_available() -> tuple[bool, str]:
+    """Installing a *system* service needs systemd plus root/passwordless sudo.
+
+    This is an OS prerequisite, not a Refine concern: `refine install` writes to
+    /etc/systemd/system and runs `systemctl enable/start`. When the prerequisite
+    is absent (e.g. an unprivileged sandbox) the test skips; on CI/root it runs
+    for real.
+    """
+    if shutil.which("systemctl") is None:
+        return False, "systemctl is not available"
+    try:
+        subprocess.run(
+            ["systemctl", "is-system-running"], capture_output=True, text=True, timeout=10
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        return False, f"systemd is not usable: {exc}"
+    if os.geteuid() != 0:
+        probe = subprocess.run(["sudo", "-n", "true"], capture_output=True, text=True)
+        if probe.returncode != 0:
+            return False, "installing a system service needs root or passwordless sudo"
+    return True, ""
+
+
+def _port_responds(port: str) -> bool:
+    try:
+        requests.get(f"http://127.0.0.1:{port}/api/project/status", timeout=2)
+        return True
+    except requests.RequestException:
+        return False
 
 
 pytestmark = pytest.mark.refine_cli
@@ -75,23 +114,53 @@ def test_doctor_runs_diagnostics() -> None:
     assert "Agent CLI" in output
 
 
+def test_install_then_uninstall_persistent_service() -> None:
+    """55 + 56. Install Refine as a persistent service, then uninstall it.
+
+    Runs a real install -> verify-listening -> uninstall -> verify-gone cycle on
+    a dedicated port, and always cleans up the unit and run state.
+    """
+    available, reason = _systemd_service_management_available()
+    if not available:
+        pytest.skip(reason)
+
+    uninstalled = False
+    installed = run_refine_cli("install", INSTALL_TEST_PORT, timeout=180)
+    try:
+        assert installed.returncode == 0, combined_output(installed)
+        # `install` blocks until the managed service is listening, so a healthy
+        # port confirms systemd actually brought the service up.
+        assert _port_responds(INSTALL_TEST_PORT), combined_output(installed)
+
+        result = run_refine_cli("uninstall", INSTALL_TEST_PORT, timeout=180)
+        uninstalled = True
+        assert result.returncode == 0, combined_output(result)
+
+        deadline = time.monotonic() + 15
+        while _port_responds(INSTALL_TEST_PORT) and time.monotonic() < deadline:
+            time.sleep(0.5)
+        assert not _port_responds(INSTALL_TEST_PORT), "service still listening after uninstall"
+    finally:
+        if not uninstalled:
+            run_refine_cli("uninstall", INSTALL_TEST_PORT, timeout=180)
+        run_refine_cli("reset", INSTALL_TEST_PORT, "--yes", timeout=60)
+
+
 @pytest.mark.parametrize(
     ("command", "journey"),
     [
-        ("install", "55. Install Refine as a persistent service"),
-        ("uninstall", "56. Uninstall the persistent service"),
         ("reset", "57. Reset the local Refine binding"),
         ("update", "60. Update Refine to the latest release"),
         ("test", "59. Run the repository test suite"),
     ],
 )
 def test_local_operation_command_is_advertised(command: str, journey: str) -> None:
-    """Destructive/host-touching journeys: confirm the command surface exists.
+    """Remaining destructive/network journeys: confirm the command surface exists.
 
-    Executing these would mutate the host (systemd/sudo), reach the network
-    (self-update), detach the shared test-app (reset), or recursively run the
-    entire Refine suite (test). The smoke check verifies the command is
-    advertised and documents its own help instead of running it.
+    Executing these would reach the network (self-update), detach the shared
+    test-app (reset), or recursively run the entire Refine suite (test). The
+    smoke check verifies the command is advertised and documents its own help
+    instead of running it.
     """
     help_result = run_refine_cli("--help")
     assert help_result.returncode == 0, combined_output(help_result)
