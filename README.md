@@ -83,11 +83,17 @@ Within each interface directory, tests should be named around user-visible outco
 
 The suite maps to the user journeys in `docs/smoke-test.md`, organized by public interface.
 
-CLI (`uv run refine <commands...>` from `REFINE_PATH` against the disposable `test-app`):
+CLI (`uv run refine <commands...>` from `REFINE_PATH` against the disposable `test-app`) — the CLI now has feature parity with the UI:
 
-- Local Operation (52-60): `status`, `restart`, `stop`/`start` cycle, `doctor`. Destructive or host/network-touching journeys (`install`, `uninstall`, `reset`, `update`, `test`) are verified at the command surface and not executed.
-- Runtime Control (61, 65, 66): provider reporting via `doctor`, runner processes and resource metrics via `ps`.
-- Multi-Node and Cluster (67, 69, 70, 74, 75): `node` list/create/activate/transfer/archive, `cluster list`, `migrate status`/`run`. Remote SSH cluster ops (`register`/`bootstrap`/`run`) are verified at the command surface.
+- Gap Management and workflow (6, 27-33, 49): `gaps` create/get/update/delete, workflow transitions (todo/cancel/retry), `edit-round`, `bulk-update`/`bulk-delete`, and `logs`. Workflow tests pause agent scheduling so user-driven states are deterministic.
+- Work Intake (23-25): `reporter` add/list/rename (with attribution cascade)/delete, and `import` parse-csv/persist.
+- Chat (34): `chat` start/read/stop with Gap context.
+- Application Lifecycle (12-18): `app` list/status/templates/generate (AI)/check, and an attach/switch/remove cycle.
+- Runtime Control (61, 63-66): provider via `doctor`, metrics via `ps`, `processes` list/agents (pause-unpause)/background.
+- Local Operation (52-60): `status`, `restart`, `stop`/`start`, real `install`/`uninstall` cycle (gated on root/passwordless sudo), `doctor`. `reset`/`update`/`test` are verified at the command surface.
+- Multi-Node and Cluster (67-75): `node` list/create/activate/transfer/archive/copy-settings, `cluster list`, `migrate status`/`run`. Remote SSH cluster ops (`register`/`update`/`bootstrap`/`run`) are verified at the command surface.
+
+Most `gaps`/`reporter`/`import`/`chat`/`processes` commands resolve the active port from the project config, so setup aligns the test-app's `[web] port` to the configured port. A few commands (`app *`, `reporter rename`) default to port 8080, so those tests pass `--port` explicitly.
 
 UI (Playwright, driving the browser plus the public API for setup/verify/cleanup):
 

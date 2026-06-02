@@ -73,6 +73,27 @@ def test_node_create_activate_transfer_archive_lifecycle() -> None:
     assert archived["active_node_id"] == "default"
 
 
+def test_node_copy_settings_between_nodes() -> None:
+    """68. Copy node settings from another node."""
+    created = run_refine_cli("node", "create", "refine-smoke-copy", timeout=60)
+    assert created.returncode == 0, combined_output(created)
+    node_id = parse_json_stdout(created)["node"]["id"]
+    try:
+        # Activate the new node, then copy the default node's Application settings
+        # into it (copy-settings writes into the active node).
+        activated = run_refine_cli("node", "activate", node_id, timeout=60)
+        assert activated.returncode == 0, combined_output(activated)
+
+        result = run_refine_cli("node", "copy-settings", "default", "application", timeout=60)
+        assert result.returncode == 0, combined_output(result)
+        payload = parse_json_stdout(result)
+        assert payload.get("section") == "application"
+        assert "copied" in payload
+    finally:
+        run_refine_cli("node", "activate", "default", timeout=60)
+        run_refine_cli("node", "archive", node_id, timeout=60)
+
+
 def test_cluster_list_returns_registry() -> None:
     """70. The cluster registry is listable (empty on a fresh checkout)."""
     result = run_refine_cli("cluster", "list")
@@ -86,6 +107,7 @@ def test_cluster_list_returns_registry() -> None:
     ("subcommand", "journey"),
     [
         ("register", "71. Register and list cluster nodes"),
+        ("update", "71. Update a registered cluster node"),
         ("bootstrap", "71. Bootstrap a cluster node over SSH"),
         ("run", "72. Run a Refine command on a remote cluster node"),
     ],
