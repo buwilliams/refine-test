@@ -1,0 +1,19 @@
+#!/usr/bin/env python3
+"""Executable entry point for the deterministic ``smoke-ai`` provider.
+
+Refine launches a configured AI provider as ``[binary_path, prompt]`` (see
+``refine_server/agent_cli.py``), so the provider Refine is pointed at must be a
+directly-executable file. This thin wrapper runs the package matcher, which lets
+``REFINE_SMOKE_AI_PATH`` point at an executable while
+``python tests/smoke_ai_provider_executable`` keeps working for the contract
+tests in ``tests/smoke_ai_provider_contract``.
+"""
+from __future__ import annotations
+
+import runpy
+from pathlib import Path
+
+# Running this file as a script puts its directory on sys.path[0]; execute the
+# package's __main__ so the matcher logic lives in exactly one place.
+_PACKAGE_DIR = Path(__file__).resolve().parent
+runpy.run_path(str(_PACKAGE_DIR), run_name="__main__")

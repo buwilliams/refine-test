@@ -15,10 +15,12 @@ Set:
 ```dotenv
 REFINE_BASE_URL=http://127.0.0.1:8787
 REFINE_PATH=/path/to/refine
-REFINE_SMOKE_AI_PATH=/path/to/refine-test/tests/smoke_ai_provider_executable
+REFINE_SMOKE_AI_PATH=/path/to/refine-test/tests/smoke_ai_provider_executable/smoke-ai
 ```
 
-`REFINE_BASE_URL` defaults to `http://127.0.0.1:8787`. `REFINE_PATH` defaults to a sibling `../refine` checkout. `REFINE_SMOKE_AI_PATH` is set automatically by the test infrastructure, but can be overridden. Shell or CI environment variables override `.env`.
+`REFINE_BASE_URL` defaults to `http://127.0.0.1:8787`. `REFINE_PATH` defaults to a sibling `../refine` checkout. `REFINE_SMOKE_AI_PATH` is set automatically by the test infrastructure, but can be overridden. Refine launches a configured provider as an executable, so this points at the `smoke-ai` executable file inside the package, not the package directory. Shell or CI environment variables override `.env`.
+
+The infrastructure attaches the disposable app on the configured port (`uv run refine target ./test-app --port <port>`) and exports `REFINE_UI_PORT` for CLI invocations, because Refine scopes app/config discovery per port.
 
 Install dependencies:
 
@@ -78,10 +80,20 @@ Within each interface directory, tests should be named around user-visible outco
 
 ## Current Scope
 
-The smoke suite covers:
+The suite maps to the user journeys in `docs/smoke-test.md`, organized by public interface.
 
-- UI shell rendering and Playwright-observed browser/runtime errors.
-- CLI help plus status/doctor checks invoked as `uv run refine <commands...>` from `REFINE_PATH` against the disposable `test-app`.
-- Deterministic `smoke-ai` matching, template output, JSON/JSONL parsing, and debug behavior.
+CLI (`uv run refine <commands...>` from `REFINE_PATH` against the disposable `test-app`):
 
-`smoke-ai` provider configuration checks require production Refine to report `agent_cli=smoke-ai` through public CLI/UI surfaces.
+- Local Operation (52-60): `status`, `restart`, `stop`/`start` cycle, `doctor`. Destructive or host/network-touching journeys (`install`, `uninstall`, `reset`, `update`, `test`) are verified at the command surface and not executed.
+- Runtime Control (61, 65, 66): provider reporting via `doctor`, runner processes and resource metrics via `ps`.
+- Multi-Node and Cluster (67, 69, 70, 74, 75): `node` list/create/activate/transfer/archive, `cluster list`, `migrate status`/`run`. Remote SSH cluster ops (`register`/`bootstrap`/`run`) are verified at the command surface.
+
+UI (Playwright, driving the browser plus the public API for setup/verify/cleanup):
+
+- Core shell, Navigation and Evidence, Work Intake, Gap Management, Review and Quality, Guided Setup, Application Lifecycle, Runtime Control, and Support.
+
+Deterministic `smoke-ai`:
+
+- Contract tests for matching, template output, JSON/JSONL parsing, and debug behavior, plus AI-driven journeys exercised through Refine (e.g. target-app instruction generation, planning chat) now that the provider is launchable.
+
+Journeys driven by the full agent work loop (e.g. moving a Gap through agent execution to review/merge) and host/network/remote operations are intentionally out of scope for a self-contained smoke run; the suite covers the user-driven controls and states around them.

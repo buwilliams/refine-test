@@ -16,6 +16,9 @@ from dotenv import load_dotenv
 ROOT = Path(__file__).resolve().parents[2]
 TEST_APP_PATH = ROOT / "test-app"
 SMOKE_AI_PATH = ROOT / "tests" / "smoke_ai_provider_executable"
+# Refine launches a configured provider as `[binary_path, prompt]`, so it must be
+# pointed at a directly-executable file, not the package directory.
+SMOKE_AI_EXECUTABLE = SMOKE_AI_PATH / "smoke-ai"
 DEFAULT_BASE_URL = "http://127.0.0.1:8787"
 DEFAULT_REFINE_PATH = ROOT.parent / "refine"
 
@@ -53,13 +56,17 @@ def refine_path() -> Path:
 def configure_process_env() -> None:
     os.environ.setdefault("REFINE_BASE_URL", DEFAULT_BASE_URL)
     os.environ.setdefault("REFINE_PATH", str(refine_path()))
-    os.environ["REFINE_SMOKE_AI_PATH"] = str(SMOKE_AI_PATH)
+    os.environ["REFINE_SMOKE_AI_PATH"] = str(SMOKE_AI_EXECUTABLE)
 
 
 def subprocess_env() -> dict[str, str]:
     configure_process_env()
     env = os.environ.copy()
-    env["REFINE_SMOKE_AI_PATH"] = str(SMOKE_AI_PATH)
+    env["REFINE_SMOKE_AI_PATH"] = str(SMOKE_AI_EXECUTABLE)
+    # Config/app discovery is port-scoped (run/<port>/apps.json). Pin the configured
+    # port so CLI commands without a PORT argument (e.g. doctor) resolve the test-app
+    # binding instead of defaulting to the empty default-port binding.
+    env["REFINE_UI_PORT"] = str(port())
     return env
 
 
@@ -117,7 +124,9 @@ def setup() -> None:
     ensure_test_app()
     run_refine_cli("stop", str(port()), timeout=30)
 
-    target = run_refine_cli("target", str(TEST_APP_PATH), "--force", timeout=60)
+    target = run_refine_cli(
+        "target", str(TEST_APP_PATH), "--port", str(port()), "--force", timeout=60
+    )
     if target.returncode != 0:
         raise InfrastructureError(_format_cli_failure("refine target", target))
 
