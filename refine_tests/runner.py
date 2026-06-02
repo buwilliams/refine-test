@@ -8,9 +8,11 @@ from collections.abc import Sequence
 from tests.support import infrastructure
 
 
+# Commands are scoped to surfaces: `cli` for the CLI surface and `smoke-ai`
+# for the deterministic provider fixture contract. There is intentionally no
+# language-level "python"/"pytest" catch-all — the default `all` already runs
+# every suite.
 PYTEST_COMMANDS: dict[str, list[str]] = {
-    "python": [],
-    "pytest": [],
     "cli": ["tests/cli"],
     "smoke-ai": ["tests/smoke_ai_provider_contract"],
     "smoke_ai": ["tests/smoke_ai_provider_contract"],
@@ -65,16 +67,15 @@ def print_help(file=sys.stdout) -> None:
     print(
         "\n".join(
             [
-                "Usage: uv run test [command] [-- extra args]",
+                "Usage: uv run refine-test [command] [-- extra args]",
                 "",
                 "Commands:",
-                "  all        Run UI and Python tests (default).",
+                "  all        Run every suite: UI, CLI, and smoke-ai (default).",
                 "  setup      Create test-app, attach Refine, start UI, and configure smoke-ai.",
                 "  teardown   Stop Refine, purge test state, and remove test-app.",
-                "  ui         Run Playwright UI tests.",
-                "  python     Run all pytest tests.",
-                "  cli        Run CLI pytest tests.",
-                "  smoke-ai   Run deterministic smoke-ai pytest tests.",
+                "  ui         Run Playwright UI-surface tests.",
+                "  cli        Run CLI-surface tests.",
+                "  smoke-ai   Run deterministic smoke-ai fixture-contract tests.",
             ]
         ),
         file=file,

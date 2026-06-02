@@ -38,18 +38,19 @@ npx playwright install chromium
 ## Run
 
 ```sh
-uv run test setup
-uv run test ui
-uv run test cli
-uv run test smoke-ai
-uv run test python
-uv run test
-uv run test teardown
+uv run refine-test setup
+uv run refine-test ui
+uv run refine-test cli
+uv run refine-test smoke-ai
+uv run refine-test
+uv run refine-test teardown
 ```
 
-`uv run test` runs the UI suite first, then the Python suites. `package.json` is kept for Playwright dependency metadata, not as the primary test runner.
+`uv run refine-test` runs every suite: the UI surface first, then the CLI surface and the smoke-ai fixture contract. The commands are scoped to surfaces (`ui`, `cli`) plus the `smoke-ai` provider contract; there is no language-level catch-all. `package.json` is kept for Playwright dependency metadata, not as the primary test runner.
 
-The CLI and UI suites create a disposable git repository at `./test-app`, attach it through `uv run refine target ./test-app --force`, start Refine on `REFINE_BASE_URL`, and configure `agent_cli=smoke-ai`. Teardown stops Refine, purges the Refine test state, and removes `./test-app`. The directory is ignored by git.
+Use `refine-test`, not `test`: a `test` alias exists but collides with the coreutils/shell `test`, so if its wrapper is ever missing `uv run test …` silently runs the system `test` (exit 0, no output) and appears to pass while running nothing. `refine-test` has no such collision. If `uv run refine-test` ever produces no output, reinstall the entry point with `uv pip install -e . --force-reinstall --no-deps` (a bare `uv sync` will not recreate a missing wrapper).
+
+The CLI and UI suites create a disposable git repository at `./test-app`, attach it through `uv run refine target ./test-app --port <port>`, start Refine on `REFINE_BASE_URL`, and configure `agent_cli=smoke-ai`. Teardown stops Refine, purges the Refine test state, and removes `./test-app`. The directory is ignored by git.
 
 Direct `smoke-ai` check:
 
