@@ -21,19 +21,19 @@ def test_processes_list_reports_runtime_state() -> None:
 def test_processes_pause_and_unpause_agents() -> None:
     """63. Pause and unpause agent scheduling."""
     try:
-        paused = parse_json_stdout(run_refine_cli("processes", "agents", "--paused"))
+        paused = parse_json_stdout(run_refine_cli("processes", "agents", "--paused", with_port=True))
         assert paused.get("agents_paused") is True
         assert parse_json_stdout(run_refine_cli("processes", "list")).get("agents_paused") is True
     finally:
-        resumed = parse_json_stdout(run_refine_cli("processes", "agents", "--running"))
+        resumed = parse_json_stdout(run_refine_cli("processes", "agents", "--running", with_port=True))
         assert resumed.get("agents_paused") is False
 
 
 def test_processes_stop_and_start_background() -> None:
     """64. Stop and restart background processes."""
     try:
-        stopped = parse_json_stdout(run_refine_cli("processes", "background", "--stopped"))
+        stopped = parse_json_stdout(run_refine_cli("processes", "background", "--stopped", with_port=True))
         assert stopped.get("stopped") is True
     finally:
-        started = parse_json_stdout(run_refine_cli("processes", "background", "--running"))
+        started = parse_json_stdout(run_refine_cli("processes", "background", "--running", with_port=True))
         assert started.get("stopped") is False

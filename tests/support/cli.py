@@ -7,10 +7,21 @@ from pathlib import Path
 from tests.support.infrastructure import port, refine_path, subprocess_env
 
 
-def run_refine_cli(*args: str, timeout: int = 30) -> subprocess.CompletedProcess[str]:
+def run_refine_cli(
+    *args: str, timeout: int = 30, with_port: bool = False
+) -> subprocess.CompletedProcess[str]:
+    """Invoke `uv run refine <args>` from REFINE_PATH.
+
+    Refine CLI commands target the configured port (default 8080) unless a port
+    is explicitly passed. The suite runs on a non-default port, so pass
+    `with_port=True` for any command that accepts a `--port` option to target the
+    running instance explicitly. (Commands without `--port` resolve the
+    configured port from `REFINE_UI_PORT`, which the infrastructure exports.)
+    """
     cwd = refine_path()
+    extra = ["--port", str(port())] if with_port else []
     return subprocess.run(
-        ["uv", "run", "refine", *args],
+        ["uv", "run", "refine", *args, *extra],
         cwd=cwd,
         env=subprocess_env(),
         text=True,
@@ -68,6 +79,7 @@ def create_gap_cli(
         "--actual", actual,
         "--target", target,
         "--priority", priority,
+        with_port=True,
     )
     payload = parse_json_stdout(result)
     assert isinstance(payload, dict), combined_output(result)
@@ -87,7 +99,7 @@ def gap_field_cli(gap_id: str, field: str) -> object:
 
 def delete_gap_cli(gap_id: str) -> None:
     if gap_id:
-        run_refine_cli("gaps", "delete", gap_id)
+        run_refine_cli("gaps", "delete", gap_id, with_port=True)
 
 
 def smoke_ai_script() -> Path:

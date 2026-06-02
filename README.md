@@ -1,16 +1,51 @@
-# Refine Interface Integration Smoke Suite
+# refine-test
 
-Standalone black-box smoke tests for Refine's browser UI, CLI, and deterministic `smoke-ai` test executable.
+refine-test is a standalone black-box smoke suite for [refine](https://github.com/buwilliams/refine) — its browser UI, its CLI, and its deterministic `smoke-ai` test provider. It never imports Refine source or inspects Refine's private files; it drives Refine through the same public interfaces a person would use and verifies the user journeys catalogued in `docs/smoke-test.md`.
 
-The suite does not import Refine source or inspect Refine's private files. It drives Refine through the same public interfaces a user would use.
+- **Black-box** - exercises Refine through its public UI, CLI, and HTTP API only — no source imports, no private-file inspection.
+- **Three surfaces** - Playwright browser tests, CLI tests invoked as `uv run refine <commands…>`, and a contract for the deterministic provider.
+- **Disposable and self-cleaning** - each run attaches a throwaway `test-app`, exercises it, and tears everything down; tests clean up the data they create.
+- **Deterministic AI** - a local `smoke-ai` executable returns repeatable responses, so AI-driven journeys (planning chat, command generation, imports) run without a real model.
+- **Journey-mapped** - tests are organized by interface and named around the user goals in `docs/smoke-test.md`.
 
-## Setup
+## Quick Start
+
+Requires a sibling `refine` checkout, Python (via [`uv`](https://docs.astral.sh/uv/)), and Node (for Playwright).
 
 ```sh
-cp .env.example .env
+cp .env.example .env   # then edit REFINE_BASE_URL and REFINE_PATH
+npm install
+uv sync
+npx playwright install chromium
 ```
 
-Set:
+Run every suite — the UI surface first, then the CLI surface and the smoke-ai contract:
+
+```sh
+uv run refine-test
+```
+
+Or target a single surface:
+
+```sh
+uv run refine-test setup      # attach a disposable test-app and start Refine
+uv run refine-test ui         # Playwright UI tests
+uv run refine-test cli        # CLI tests
+uv run refine-test smoke-ai   # deterministic provider contract
+uv run refine-test teardown   # stop Refine and remove all test state
+```
+
+refine-test has its own runner:
+
+```sh
+uv run refine-test --help
+```
+
+Use `refine-test`, not the `test` alias: `test` collides with the shell/coreutils `test`, so if its wrapper is ever missing, `uv run test …` silently runs the system binary (exit 0, no output) and the suite appears to pass while running nothing. If `uv run refine-test` ever prints nothing, reinstall the entry point with `uv pip install -e . --force-reinstall --no-deps` (a bare `uv sync` will not recreate a missing wrapper).
+
+## Configuration
+
+Settings live in `.env`; shell or CI environment variables override it.
 
 ```dotenv
 REFINE_BASE_URL=http://127.0.0.1:8787
@@ -18,89 +53,42 @@ REFINE_PATH=/path/to/refine
 REFINE_SMOKE_AI_PATH=/path/to/refine-test/tests/smoke_ai_provider_executable/smoke-ai
 ```
 
-`REFINE_BASE_URL` defaults to `http://127.0.0.1:8787`. `REFINE_PATH` defaults to a sibling `../refine` checkout. `REFINE_SMOKE_AI_PATH` is set automatically by the test infrastructure, but can be overridden. Refine launches a configured provider as an executable, so this points at the `smoke-ai` executable file inside the package, not the package directory. Shell or CI environment variables override `.env`.
+- `REFINE_BASE_URL` — where Refine serves; defaults to `http://127.0.0.1:8787`.
+- `REFINE_PATH` — the Refine checkout to drive; defaults to a sibling `../refine`.
+- `REFINE_SMOKE_AI_PATH` — set automatically by the infrastructure. Refine launches a provider as an executable, so this points at the `smoke-ai` executable file inside the package, not the package directory.
 
-The infrastructure attaches the disposable app on the configured port (`uv run refine target ./test-app --port <port>`) and exports `REFINE_UI_PORT` for CLI invocations, because Refine scopes app/config discovery per port.
+`setup` attaches the disposable `test-app` on the configured port, starts Refine, and configures `agent_cli=smoke-ai`; `teardown` stops Refine, purges the test state, and removes `./test-app` (which is git-ignored). `package.json` is kept for Playwright dependency metadata, not as the primary runner.
 
-Install dependencies:
-
-```sh
-npm install
-uv sync
-```
-
-Install Playwright browsers if needed:
-
-```sh
-npx playwright install chromium
-```
-
-## Run
-
-```sh
-uv run refine-test setup
-uv run refine-test ui
-uv run refine-test cli
-uv run refine-test smoke-ai
-uv run refine-test
-uv run refine-test teardown
-```
-
-`uv run refine-test` runs every suite: the UI surface first, then the CLI surface and the smoke-ai fixture contract. The commands are scoped to surfaces (`ui`, `cli`) plus the `smoke-ai` provider contract; there is no language-level catch-all. `package.json` is kept for Playwright dependency metadata, not as the primary test runner.
-
-Use `refine-test`, not `test`: a `test` alias exists but collides with the coreutils/shell `test`, so if its wrapper is ever missing `uv run test …` silently runs the system `test` (exit 0, no output) and appears to pass while running nothing. `refine-test` has no such collision. If `uv run refine-test` ever produces no output, reinstall the entry point with `uv pip install -e . --force-reinstall --no-deps` (a bare `uv sync` will not recreate a missing wrapper).
-
-The CLI and UI suites create a disposable git repository at `./test-app`, attach it through `uv run refine target ./test-app --port <port>`, start Refine on `REFINE_BASE_URL`, and configure `agent_cli=smoke-ai`. Teardown stops Refine, purges the Refine test state, and removes `./test-app`. The directory is ignored by git.
-
-Direct `smoke-ai` check:
-
-```sh
-python tests/smoke_ai_provider_executable "Say exactly the single word hello and nothing else."
-```
-
-Expected stdout:
-
-```text
-hello
-```
-
-## Data Convention
-
-Tests use `refine-smoke` as the fixed namespace for disposable artifacts. All Refine-facing tests use the disposable `test-app` target application; workflows that create Refine data clean up the artifacts they create.
+Refine CLI commands target the configured port (default 8080) unless a port is explicitly passed. The suite runs on a non-default port, so the infrastructure exports `REFINE_UI_PORT` as the configured port for commands that take no port argument, and the tests pass an explicit port (positional for runtime commands, `--port` for data commands) to every command that accepts one.
 
 ## Test Organization
 
 Tests are organized first by public interface:
 
-- `tests/ui`: Playwright browser tests.
-- `tests/cli`: command-line tests invoked as `uv run refine <commands...>` from `REFINE_PATH`.
-- `tests/smoke_ai_provider_contract`: pytest contract tests for the deterministic provider executable.
-- `tests/smoke_ai_provider_executable`: the local deterministic `smoke-ai` provider executable used by UI and CLI tests.
+- `tests/ui` — Playwright browser tests.
+- `tests/cli` — CLI tests invoked as `uv run refine <commands…>` from `REFINE_PATH`.
+- `tests/smoke_ai_provider_contract` — pytest contract for the deterministic provider.
+- `tests/smoke_ai_provider_executable` — the local `smoke-ai` provider used by the UI and CLI suites.
 
-Within each interface directory, tests should be named around user-visible outcomes once those outcomes are documented.
+Within each directory, tests are named around user-visible outcomes. They use `refine-smoke` as the fixed namespace for disposable artifacts, run against the disposable `test-app`, and clean up what they create.
 
-## Current Scope
+The provider can be exercised directly:
 
-The suite maps to the user journeys in `docs/smoke-test.md`, organized by public interface.
+```sh
+python tests/smoke_ai_provider_executable "Say exactly the single word hello and nothing else."
+# -> hello
+```
 
-CLI (`uv run refine <commands...>` from `REFINE_PATH` against the disposable `test-app`) — the CLI now has feature parity with the UI:
+## Coverage
 
-- Gap Management and workflow (6, 27-33, 49): `gaps` create/get/update/delete, workflow transitions (todo/cancel/retry), `edit-round`, `bulk-update`/`bulk-delete`, and `logs`. Workflow tests pause agent scheduling so user-driven states are deterministic.
-- Work Intake (23-25): `reporter` add/list/rename (with attribution cascade)/delete, and `import` parse-csv/persist.
-- Chat (34): `chat` start/read/stop with Gap context.
-- Application Lifecycle (12-18): `app` list/status/templates/generate (AI)/check, and an attach/switch/remove cycle.
-- Runtime Control (61, 63-66): provider via `doctor`, metrics via `ps`, `processes` list/agents (pause-unpause)/background.
-- Local Operation (52-60): `status`, `restart`, `stop`/`start`, real `install`/`uninstall` cycle (gated on root/passwordless sudo), `doctor`. `reset`/`update`/`test` are verified at the command surface.
-- Multi-Node and Cluster (67-75): `node` list/create/activate/transfer/archive/copy-settings, `cluster list`, `migrate status`/`run`. Remote SSH cluster ops (`register`/`update`/`bootstrap`/`run`) are verified at the command surface.
+The suite maps to the journeys in `docs/smoke-test.md`:
 
-Most `gaps`/`reporter`/`import`/`chat`/`processes` commands resolve the active port from the project config, so setup aligns the test-app's `[web] port` to the configured port. A few commands (`app *`, `reporter rename`) default to port 8080, so those tests pass `--port` explicitly.
+- **CLI** (full parity with the UI) — Gap management and workflow, work intake (reporters, import), chat, application lifecycle, runtime control and processes, local operation, and multi-node/cluster.
+- **UI** (Playwright, plus the public API for setup/verify/cleanup) — app shell, navigation and evidence, work intake, gap management, review and quality, guided setup, application lifecycle, runtime control, and support.
+- **smoke-ai** — provider matching, template/JSON/JSONL output and debug behavior, plus AI-driven journeys exercised through Refine.
 
-UI (Playwright, driving the browser plus the public API for setup/verify/cleanup):
+Journeys that require the full agent work loop (driving a Gap through agent execution to merge) or host/network/remote operations (systemd install, self-update, SSH cluster) are out of scope for a self-contained run; the suite covers the user-driven controls and states around them, and verifies those commands at the surface.
 
-- Core shell, Navigation and Evidence, Work Intake, Gap Management, Review and Quality, Guided Setup, Application Lifecycle, Runtime Control, and Support.
+## License
 
-Deterministic `smoke-ai`:
-
-- Contract tests for matching, template output, JSON/JSONL parsing, and debug behavior, plus AI-driven journeys exercised through Refine (e.g. target-app instruction generation, planning chat) now that the provider is launchable.
-
-Journeys driven by the full agent work loop (e.g. moving a Gap through agent execution to review/merge) and host/network/remote operations are intentionally out of scope for a self-contained smoke run; the suite covers the user-driven controls and states around them.
+[MIT](https://github.com/buwilliams/refine/blob/main/LICENSE), same as refine.

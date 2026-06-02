@@ -43,7 +43,7 @@ def test_import_persist_creates_gaps() -> None:
     """25. Persist reviewed import drafts as Gaps."""
     ensure_reporter()
     drafts = parse_json_stdout(run_refine_cli("import", "parse-csv", CSV))["drafts"]
-    persisted = run_refine_cli("import", "persist", json.dumps({"drafts": drafts}))
+    persisted = run_refine_cli("import", "persist", json.dumps({"drafts": drafts}), with_port=True)
     assert persisted.returncode == 0, combined_output(persisted)
     payload = parse_json_stdout(persisted)
 

@@ -9,13 +9,7 @@ import tempfile
 
 import pytest
 
-from tests.support import infrastructure
-from tests.support.cli import (
-    combined_output,
-    configured_port,
-    parse_json_stdout,
-    run_refine_cli,
-)
+from tests.support.cli import combined_output, parse_json_stdout, run_refine_cli
 from tests.support.env import TEST_APP_PATH
 
 
@@ -24,14 +18,14 @@ pytestmark = pytest.mark.refine_cli
 
 def test_app_list_includes_active_test_app() -> None:
     """14. Browse known apps (the swap source list)."""
-    payload = parse_json_stdout(run_refine_cli("app", "list", "--port", configured_port()))
+    payload = parse_json_stdout(run_refine_cli("app", "list", with_port=True))
     paths = [a.get("path") for a in payload.get("apps", [])]
     assert str(TEST_APP_PATH.resolve()) in paths
 
 
 def test_app_status_reports_attached_app() -> None:
     """18 (status surface). The active target app is reported."""
-    payload = parse_json_stdout(run_refine_cli("app", "status", "--port", configured_port()))
+    payload = parse_json_stdout(run_refine_cli("app", "status", with_port=True))
     assert payload.get("attached") is True
     assert payload.get("client_repo") == str(TEST_APP_PATH.resolve())
 
@@ -45,9 +39,7 @@ def test_app_templates_are_listed() -> None:
 
 def test_app_generate_commands_with_ai() -> None:
     """17. Generate target-application commands with AI."""
-    result = run_refine_cli(
-        "app", "generate", "--kind", "start", "--port", configured_port()
-    )
+    result = run_refine_cli("app", "generate", "--kind", "start", with_port=True)
     assert result.returncode == 0, combined_output(result)
     payload = parse_json_stdout(result)
     assert payload.get("ok") is True
@@ -58,7 +50,7 @@ def test_app_check_reports_health_status() -> None:
     """18. Confirm the target application reports a health status."""
     # The bare test-app has no run/health commands, so `check` reports an
     # unhealthy state (non-zero exit) but still returns a structured payload.
-    result = run_refine_cli("app", "check", "--port", configured_port())
+    result = run_refine_cli("app", "check", with_port=True)
     payload = parse_json_stdout(result)
     assert isinstance(payload, dict)
     assert "state" in payload
@@ -70,31 +62,26 @@ def test_app_attach_switch_remove_cycle() -> None:
     throwaway = tempfile.mkdtemp(prefix="refine-smoke-app-")
     _git_init_app(throwaway)
     test_app = str(TEST_APP_PATH.resolve())
-    port = configured_port()
     try:
-        attached = run_refine_cli("app", "attach", throwaway, "--port", port)
+        attached = run_refine_cli("app", "attach", throwaway, with_port=True)
         assert attached.returncode == 0, combined_output(attached)
-        status = parse_json_stdout(run_refine_cli("app", "status", "--port", port))
+        status = parse_json_stdout(run_refine_cli("app", "status", with_port=True))
         assert status.get("client_repo") != test_app
 
         # Swap back to the disposable test-app.
-        switched = run_refine_cli("app", "switch", test_app, "--port", port, "--force")
+        switched = run_refine_cli("app", "switch", test_app, "--force", with_port=True)
         assert switched.returncode == 0, combined_output(switched)
-        infrastructure.align_web_port()
-        final = parse_json_stdout(run_refine_cli("app", "status", "--port", port))
+        final = parse_json_stdout(run_refine_cli("app", "status", with_port=True))
         assert final.get("client_repo") == test_app
 
-        removed = run_refine_cli("app", "remove", throwaway, "--port", port)
+        removed = run_refine_cli("app", "remove", throwaway, with_port=True)
         assert removed.returncode == 0, combined_output(removed)
-        listed = parse_json_stdout(run_refine_cli("app", "list", "--port", port))
+        listed = parse_json_stdout(run_refine_cli("app", "list", with_port=True))
         paths = [a.get("path") for a in listed.get("apps", [])]
         assert os.path.realpath(throwaway) not in [os.path.realpath(p) for p in paths if p]
     finally:
-        # `app switch --force` rewrites refine.toml with the default web port;
-        # restore the configured port and ensure the test-app is active again.
-        run_refine_cli("app", "switch", test_app, "--port", port, "--force")
-        infrastructure.align_web_port()
-        run_refine_cli("app", "remove", throwaway, "--port", port)
+        run_refine_cli("app", "switch", test_app, "--force", with_port=True)
+        run_refine_cli("app", "remove", throwaway, with_port=True)
         shutil.rmtree(throwaway, ignore_errors=True)
 
 

@@ -6,7 +6,6 @@ import pytest
 
 from tests.support.cli import (
     combined_output,
-    configured_port,
     create_gap_cli,
     delete_gap_cli,
     gap_field_cli,
@@ -48,9 +47,7 @@ def test_reporter_rename_cascades_to_gap_attribution() -> None:
     gap_id = create_gap_cli(reporter=name, actual="cascade actual", target="cascade target")
     renamed = f"{name}-renamed"
     try:
-        result = run_refine_cli(
-            "reporter", "rename", str(reporter_id), renamed, "--port", configured_port()
-        )
+        result = run_refine_cli("reporter", "rename", str(reporter_id), renamed, with_port=True)
         assert result.returncode == 0, combined_output(result)
 
         rounds = gap_field_cli(gap_id, "rounds")

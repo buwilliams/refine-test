@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -131,7 +130,6 @@ def setup() -> None:
     if target.returncode != 0:
         raise InfrastructureError(_format_cli_failure("refine target", target))
 
-    align_web_port()
     set_refine_setting("agent_cli", "smoke-ai")
 
     started = run_refine_cli("start", str(port()), timeout=90)
@@ -149,27 +147,6 @@ def setup() -> None:
     agent_cli = str(settings.get("agent_cli") or "")
     if agent_cli != "smoke-ai":
         raise InfrastructureError(f"agent_cli is {agent_cli!r}, expected 'smoke-ai'")
-
-
-def align_web_port() -> None:
-    """Set the test-app config's [web] port to the configured port.
-
-    `refine target` writes the default web port (8080) into refine.toml, but the
-    suite serves a non-default port (e.g. 8081). CLI data commands resolve their
-    target runner from the config's web port, so without this they would reach
-    the wrong (non-running) port. Aligning the config is how a user running on a
-    custom port would configure it, and lets every CLI command target the right
-    runner without an explicit --port.
-    """
-    toml_path = TEST_APP_PATH / ".refine" / "refine.toml"
-    if not toml_path.is_file():
-        raise InfrastructureError(f"refine.toml not found at {toml_path}")
-    text = toml_path.read_text(encoding="utf-8")
-    new_text, count = re.subn(r"(?m)^port\s*=\s*\d+\s*$", f"port = {port()}", text)
-    if count == 0:
-        raise InfrastructureError(f"could not find a web port to align in {toml_path}")
-    if new_text != text:
-        toml_path.write_text(new_text, encoding="utf-8")
 
 
 def set_refine_setting(key: str, value: str) -> None:

@@ -31,11 +31,11 @@ def _paused_agents():
     runner and advanced to `in-progress`; pausing keeps the Gap in the state the
     test set so the transition under test is the one observed.
     """
-    run_refine_cli("processes", "agents", "--paused")
+    run_refine_cli("processes", "agents", "--paused", with_port=True)
     try:
         yield
     finally:
-        run_refine_cli("processes", "agents", "--running")
+        run_refine_cli("processes", "agents", "--running", with_port=True)
 
 
 def test_gap_create_get_update_delete() -> None:
@@ -45,7 +45,8 @@ def test_gap_create_get_update_delete() -> None:
         assert gap_field_cli(gap_id, "status") == "backlog"
 
         updated = run_refine_cli(
-            "gaps", "update", gap_id, "--name", "cli renamed", "--priority", "high"
+            "gaps", "update", gap_id, "--name", "cli renamed", "--priority", "high",
+            with_port=True,
         )
         assert updated.returncode == 0, combined_output(updated)
         assert gap_field_cli(gap_id, "name") == "cli renamed"
@@ -61,16 +62,16 @@ def test_gap_workflow_transitions() -> None:
     """7 + 28 + 32. Move a Gap through user-allowed workflow states."""
     gap_id = create_gap_cli(actual="wf actual", target="wf target")
     try:
-        moved = run_refine_cli("gaps", "update", gap_id, "--status", "todo")
+        moved = run_refine_cli("gaps", "update", gap_id, "--status", "todo", with_port=True)
         assert moved.returncode == 0, combined_output(moved)
         assert gap_field_cli(gap_id, "status") == "todo"
 
-        cancelled = run_refine_cli("gaps", "cancel", gap_id)
+        cancelled = run_refine_cli("gaps", "cancel", gap_id, with_port=True)
         assert cancelled.returncode == 0, combined_output(cancelled)
         assert gap_field_cli(gap_id, "status") == "cancelled"
 
         # Retry reopens a terminal Gap back into the active queue.
-        retried = run_refine_cli("gaps", "retry", gap_id)
+        retried = run_refine_cli("gaps", "retry", gap_id, with_port=True)
         assert retried.returncode == 0, combined_output(retried)
         assert gap_field_cli(gap_id, "status") == "todo"
     finally:
@@ -81,12 +82,13 @@ def test_gap_revise_latest_round() -> None:
     """30. Revise the latest feedback round on a Gap."""
     gap_id = create_gap_cli(actual="round actual", target="round target")
     try:
-        run_refine_cli("gaps", "update", gap_id, "--status", "todo")
+        run_refine_cli("gaps", "update", gap_id, "--status", "todo", with_port=True)
         edited = run_refine_cli(
             "gaps", "edit-round", gap_id,
             "--reporter", "refine-smoke",
             "--actual", "revised actual",
             "--target", "revised target",
+            with_port=True,
         )
         assert edited.returncode == 0, combined_output(edited)
 
@@ -106,14 +108,15 @@ def test_gap_bulk_update_and_delete() -> None:
     deleted = False
     try:
         bulk = run_refine_cli(
-            "gaps", "bulk-update", "--status-update", "todo", "--selected-ids", ids
+            "gaps", "bulk-update", "--status-update", "todo", "--selected-ids", ids,
+            with_port=True,
         )
         assert bulk.returncode == 0, combined_output(bulk)
         assert parse_json_stdout(bulk).get("updated") == 2
         assert gap_field_cli(first, "status") == "todo"
         assert gap_field_cli(second, "status") == "todo"
 
-        removed = run_refine_cli("gaps", "bulk-delete", "--selected-ids", ids)
+        removed = run_refine_cli("gaps", "bulk-delete", "--selected-ids", ids, with_port=True)
         assert removed.returncode == 0, combined_output(removed)
         deleted = True
         assert parse_json_stdout(removed).get("deleted") == 2
