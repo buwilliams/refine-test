@@ -33,6 +33,9 @@ test("revises the latest feedback round", async ({ request }) => {
   // 30. Add a new round of feedback to a Gap (user-driven round revision).
   await ensureAttachedProject(request);
   const id = await createGap(request, { actual: "round actual", target: "round target" });
+  // Pause agents so the Gap stays in `todo` (the runner would otherwise pick it
+  // up, and a round may only be edited from todo/review/failed).
+  await request.post("/api/processes/agents", { data: { paused: true } });
   try {
     const moved = await request.post("/api/gaps/bulk", {
       data: { update: { status: "todo" }, gap_ids: [id] },
@@ -47,6 +50,7 @@ test("revises the latest feedback round", async ({ request }) => {
     const rounds = (gap.rounds ?? []) as Array<{ actual?: string }>;
     expect(rounds.at(-1)?.actual).toBe("revised actual");
   } finally {
+    await request.post("/api/processes/agents", { data: { paused: false } });
     await deleteGap(request, id);
   }
 });
@@ -74,6 +78,9 @@ test("moves a Gap between user-allowed workflow states", async ({ request }) => 
   // 32. Move a Gap between backlog, todo, ... where user action is allowed.
   await ensureAttachedProject(request);
   const id = await createGap(request, { actual: "move actual", target: "move target" });
+  // Pause agent scheduling so the Gap stays in the state we set; otherwise the
+  // runner immediately picks up `todo` and advances it (in-progress -> ...).
+  await request.post("/api/processes/agents", { data: { paused: true } });
   try {
     const toTodo = await jsonObject(
       await request.post("/api/gaps/bulk", { data: { update: { status: "todo" }, gap_ids: [id] } }),
@@ -86,6 +93,7 @@ test("moves a Gap between user-allowed workflow states", async ({ request }) => 
       })
       .toBe("todo");
   } finally {
+    await request.post("/api/processes/agents", { data: { paused: false } });
     await deleteGap(request, id);
   }
 });
