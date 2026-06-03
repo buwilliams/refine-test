@@ -133,3 +133,24 @@ capabilities above (24, 45, 67-69, 73).
 81. Pull teammates' work from the remote so every node converges on the same backlog.
 82. Keep node ownership and reporter attribution intact as work propagates between nodes.
 83. Read both a single node's queue and the cluster's aggregate backlog.
+
+## Feature Organization
+
+A Feature is an ordered collection of Gaps for planning and executing larger
+work, without replacing the standalone Gap workflow. Features are node-bound like
+Gaps, derive their status and progress from their Gaps rather than carrying their
+own mutable workflow state, and serialize execution within a Feature while letting
+different Features run in parallel. Features do not appear on the Dashboard.
+
+84. Create a Feature to plan larger work as an ordered set of Gaps.
+85. Add new or existing Gaps to a Feature and order them for execution.
+86. Reorder Gaps within a Feature to change the execution sequence.
+87. Remove a Gap from a Feature without deleting the Gap.
+88. Track a Feature's derived status and progress as its Gaps advance.
+89. Browse, search, and filter Features by derived status.
+90. Update a Feature's name and description.
+91. Import a batch of Gaps as a new Feature, or append them to an existing one.
+92. Plan a Feature with ordered Gaps by default from a planning chat.
+93. Cancel a Feature, cascading to its non-terminal Gaps.
+94. Delete a Feature, cascading to its Gaps.
+95. Serialize agent work within a Feature while running different Features in parallel.
