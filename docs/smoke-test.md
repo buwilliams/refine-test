@@ -116,3 +116,20 @@ outcome-oriented, and organized by framing rather than by implementation module.
 ## Support
 
 76. Report a Refine bug or feature request.
+
+## Distributed Team Workflow
+
+Refine's headline use case is running it across a team: each teammate runs their
+own Refine instance (a separate port, or a separate machine) attached to a clone
+of one shared repo, and the instances coordinate by pushing and pulling
+`.refine/` state through a shared Git remote. This is the end-to-end journey a
+team actually exercises, building on the atomic node, reporter, and Git-sync
+capabilities above (24, 45, 67-69, 73).
+
+77. Run a separate Refine instance per teammate, each on its own port or machine, against the same project.
+78. Join an existing team project by cloning its Git remote and adopting the shared Refine state.
+79. Give each instance its own work-owning node and its own reporters.
+80. Raise work on one node and publish it to the team through the shared Git remote.
+81. Pull teammates' work from the remote so every node converges on the same backlog.
+82. Keep node ownership and reporter attribution intact as work propagates between nodes.
+83. Read both a single node's queue and the cluster's aggregate backlog.
