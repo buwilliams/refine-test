@@ -1,6 +1,6 @@
 # refine-test
 
-refine-test is a standalone black-box smoke suite for [refine](https://github.com/buwilliams/refine) — its browser UI, its CLI, and its deterministic `smoke-ai` test provider. It never imports Refine source or inspects Refine's private files; it drives Refine through the same public interfaces a person would use and verifies the user journeys catalogued in `docs/smoke-test.md`.
+refine-test is a standalone black-box smoke suite for [buwilliams/refine](https://github.com/buwilliams/refine) — its browser UI, its CLI, and its deterministic `smoke-ai` test provider. It never imports Refine source or inspects Refine's private files; it drives Refine through the same public interfaces a person would use and verifies the user journeys catalogued in `docs/smoke-test.md`.
 
 - **Black-box** - exercises Refine through its public UI, CLI, and HTTP API only — no source imports, no private-file inspection.
 - **Three surfaces** - Playwright browser tests, CLI tests invoked as `uv run refine <commands…>`, and a contract for the deterministic provider.
