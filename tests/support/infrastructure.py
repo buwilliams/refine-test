@@ -185,7 +185,12 @@ def set_refine_setting(key: str, value: str) -> None:
 def teardown() -> None:
     configure_process_env()
     run_refine_cli("stop", str(port()), timeout=30)
-    run_refine_cli("reset", "--purge", "--yes", timeout=60)
+    # Scope the reset to the test port. A portless `reset` wipes run state for
+    # ALL ports of this checkout, deleting other refine instances' run dirs and
+    # IPC sockets (e.g. a dev instance on 8080 → "Backend runner unavailable").
+    # Passing the port also lets --purge resolve and delete the test app's
+    # .refine (which is None, and so a no-op, without a port).
+    run_refine_cli("reset", str(port()), "--purge", "--yes", timeout=60)
     if TEST_APP_PATH.exists():
         shutil.rmtree(TEST_APP_PATH)
     deadline = time.monotonic() + 3.0
